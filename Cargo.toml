@@ -1,0 +1,11 @@
+[package]
+name = "autoclick"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fltk = "1.3.15"
+rdev = "0.5.1"
+
+[profile.release]
+strip = true
