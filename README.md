@@ -1,3 +1,3 @@
 # Auto Clicker
 
-Simple auto clicker app.
+Simple cross platform auto clicker app made with rust.
