@@ -1,13 +1,10 @@
 use std::{
-    sync::{
-        mpsc::{self, TryRecvError},
-        Arc, Mutex,
-    },
+    sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
 
 use fltk::{
-    app, button::Button, enums::Align, frame::Frame, group::Flex, group::Row, input::IntInput,
+    app, button::Button, enums::Align, frame::Frame, group::Flex, input::IntInput, menu::Choice,
     prelude::*, window::Window,
 };
 
@@ -23,10 +20,12 @@ fn simulate(event_type: &rdev::EventType) {
     std::thread::sleep(Duration::from_millis(5));
 }
 
-fn start_clicking(rx: Arc<Mutex<mpsc::Receiver<()>>>, delay: u64) {
+fn start_clicking(rx: Arc<Mutex<mpsc::Receiver<()>>>, delay: u64, button: rdev::Button) {
+    use mpsc::TryRecvError;
+
     std::thread::spawn(move || loop {
-        simulate(&rdev::EventType::ButtonPress(rdev::Button::Left));
-        simulate(&rdev::EventType::ButtonRelease(rdev::Button::Left));
+        simulate(&rdev::EventType::ButtonPress(button));
+        simulate(&rdev::EventType::ButtonRelease(button));
         std::thread::sleep(Duration::from_millis(delay));
 
         match rx.lock().unwrap().try_recv() {
@@ -78,9 +77,15 @@ fn main() {
     Frame::default().with_label("Auto clicker");
 
     let mut delay_ipt = with_label(IntInput::default, "Delay: ");
-    delay_ipt.set_value("20");
+    delay_ipt.set_value("100");
 
     let mut keybind_btn = with_label(Button::default, "Keybind: ");
+
+    let mut button_select = with_label(Choice::default, "Button: ");
+    button_select.add_choice("Left");
+    button_select.add_choice("Right");
+    button_select.add_choice("Middle");
+    button_select.set_value(0);
 
     let mut clicking_text = Frame::default();
 
@@ -119,9 +124,17 @@ fn main() {
                         is_clicking = false;
                         clicking_text.set_label("");
                     } else {
-                        start_clicking(rx.clone(), delay_ipt.value().parse().unwrap());
+                        let button = match button_select.value() {
+                            0 => rdev::Button::Left,
+                            1 => rdev::Button::Right,
+                            2 => rdev::Button::Middle,
+                            _ => unreachable!(),
+                        };
+
+                        let delay = delay_ipt.value().parse().unwrap();
+                        start_clicking(rx.clone(), delay, button);
                         is_clicking = true;
-                        clicking_text.set_label("Clicking");
+                        clicking_text.set_label("Clicking...");
                     }
                 }
                 Message::KeyPress(key) => {
