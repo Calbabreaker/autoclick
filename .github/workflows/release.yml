@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  release:
+    name: Publish release for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            bin_name: autoclick
+            asset_name: autoclick-x86_64-linux
+          - os: windows-latest
+            bin_name: autoclick.exe
+            asset_name: autoclick-x86_64-windows.exe
+          - os: macos-latest
+            bin_name: autoclick
+            asset_name: autoclick-x86_64-macos
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpango1.0-dev libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev libxfixes-dev libpng-dev libgl1-mesa-dev libglu1-mesa-dev
+        if: runner.os == 'Linux'
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Build
+        run: cargo build --release --locked && mv target/release/${{ matrix.bin_name }} ${{ matrix.asset_name }}
+        shell: bash
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.asset_name }}
+          generate_release_notes: true
