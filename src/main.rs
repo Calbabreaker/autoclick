@@ -7,8 +7,8 @@ use std::{
 };
 
 use fltk::{
-    app, button::Button, enums::Align, frame::Frame, group::Flex, input::IntInput, prelude::*,
-    window::Window,
+    app, button::Button, enums::Align, frame::Frame, group::Flex, group::Row, input::IntInput,
+    prelude::*, window::Window,
 };
 
 fn simulate(event_type: &rdev::EventType) {
@@ -20,21 +20,17 @@ fn simulate(event_type: &rdev::EventType) {
     }
 
     // Make sure OS registers event
-    std::thread::sleep(Duration::from_millis(10));
+    std::thread::sleep(Duration::from_millis(5));
 }
 
 fn start_clicking(rx: Arc<Mutex<mpsc::Receiver<()>>>, delay: u64) {
-    println!("Start clicking");
     std::thread::spawn(move || loop {
         simulate(&rdev::EventType::ButtonPress(rdev::Button::Left));
         simulate(&rdev::EventType::ButtonRelease(rdev::Button::Left));
         std::thread::sleep(Duration::from_millis(delay));
 
         match rx.lock().unwrap().try_recv() {
-            Ok(_) | Err(TryRecvError::Disconnected) => {
-                println!("Stop clicking");
-                break;
-            }
+            Ok(_) | Err(TryRecvError::Disconnected) => break,
             Err(TryRecvError::Empty) => (),
         }
     });
@@ -48,11 +44,12 @@ fn handle_rdev_event(event: &rdev::Event, s: &app::Sender<Message>) {
 }
 
 fn with_label<W: WidgetExt>(func: fn() -> W, label: &str) -> W {
-    let flex = Flex::default();
+    let mut flex = Flex::default();
     Frame::default()
         .with_label(label)
         .with_align(Align::Inside | Align::Right);
     let widget = func();
+    flex.set_size(&widget, 100);
     flex.end();
     widget
 }
@@ -68,13 +65,13 @@ enum Message {
 fn main() {
     let app = app::App::default().with_scheme(app::Scheme::Gtk);
     let mut window = Window::default()
-        .with_size(200, 300)
+        .with_size(300, 300)
         .with_label("Auto clicker")
         .center_screen();
 
     // Layout
     let flex = Flex::default()
-        .with_size(100, 100)
+        .with_size(100, 150)
         .column()
         .center_of_parent();
 
@@ -85,9 +82,10 @@ fn main() {
 
     let mut keybind_btn = with_label(Button::default, "Keybind: ");
 
+    let mut clicking_text = Frame::default();
+
     flex.end();
 
-    window.make_resizable(true);
     window.end();
     window.show();
 
@@ -119,9 +117,11 @@ fn main() {
                     if is_clicking {
                         loop_tx.send(()).unwrap();
                         is_clicking = false;
+                        clicking_text.set_label("");
                     } else {
                         start_clicking(rx.clone(), delay_ipt.value().parse().unwrap());
                         is_clicking = true;
+                        clicking_text.set_label("Clicking");
                     }
                 }
                 Message::KeyPress(key) => {
@@ -141,4 +141,3 @@ fn main() {
         }
     }
 }
-
