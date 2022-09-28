@@ -97,10 +97,11 @@ fn main() {
     // Logic
     let (s, r) = app::channel::<Message>();
 
-    // When loop_tx sends anything, the loop thread will stop
+    // When loop_tx sends anything, the loop clickin  thread will stop
     let (loop_tx, loop_rx) = mpsc::channel();
-    let rx = Arc::new(Mutex::new(loop_rx));
+    let loop_rx = Arc::new(Mutex::new(loop_rx));
 
+    // Listening to rdev events blocks the thread so move it to different one
     std::thread::spawn(move || {
         rdev::listen(move |event| handle_rdev_event(&event, &s)).unwrap();
     });
@@ -110,6 +111,7 @@ fn main() {
     let mut is_setting_keybind = false;
 
     keybind_btn.set_callback(move |_| {
+        // Need to send messages because can't modify variables in callback
         s.send(Message::StartSetKeybind);
     });
 
@@ -132,11 +134,12 @@ fn main() {
                         };
 
                         let delay = delay_ipt.value().parse().unwrap();
-                        start_clicking(rx.clone(), delay, button);
+                        start_clicking(loop_rx.clone(), delay, button);
                         is_clicking = true;
                         clicking_text.set_label("Clicking...");
                     }
                 }
+                // Key press messages sent from rdev thread
                 Message::KeyPress(key) => {
                     if is_setting_keybind {
                         s.send(Message::SetKeybind(key));
